@@ -75,7 +75,8 @@ set_allocation_strategy(FIRST_FIT);   // FIRST_FIT, BEST_FIT, WORST_FIT, NEXT_FI
 ```
 
 * Add/remove allocations using `mini_malloc(size)` and `mini_free(ptr)`.
-
+* make clean
+* make
 ---
 
 ## Output Example
@@ -83,7 +84,7 @@ set_allocation_strategy(FIRST_FIT);   // FIRST_FIT, BEST_FIT, WORST_FIT, NEXT_FI
 ```
 MiniMallocPlus Demo
 
-Step 1: Allocate a=100, b=200, c=50
+1) Allocate a=100, b=200, c=50
 Memory Stats:
 Total Memory       : 1048576 bytes
 Allocated          : 350 bytes
@@ -92,7 +93,7 @@ Fragmentation      : 0.02%
 Active Allocations : 3
 Largest Free Block : 1048034 bytes
 
-Step 2: Free b
+2) Free b
 Memory Stats:
 Total Memory       : 1048576 bytes
 Allocated          : 150 bytes
@@ -101,7 +102,7 @@ Fragmentation      : 0.04%
 Active Allocations : 2
 Largest Free Block : 1048034 bytes
 
-Step 3: Allocate d=150
+3) Allocate d=150
 Memory Stats:
 Total Memory       : 1048576 bytes
 Allocated          : 300 bytes
@@ -110,8 +111,6 @@ Fragmentation      : 0.02%
 Active Allocations : 3
 Largest Free Block : 1048034 bytes
 ```
-
-> Note: Output format is cleaned for better readability.
 
 ---
 
