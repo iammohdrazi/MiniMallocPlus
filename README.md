@@ -1,4 +1,3 @@
-```markdown
 # MiniMallocPlus
 
 **MiniMallocPlus** is a **custom memory allocator** implemented in C.  
