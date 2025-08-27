@@ -1,35 +1,28 @@
 #include "mini_malloc.h"
 #include "logger.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
-// Memory pool
-size_t MEMORY_POOL_SIZE = 1024 * 1024; // 1 MB
-size_t allocated_memory = 0;
-size_t free_memory = 1024 * 1024;
-size_t largest_free_block = 1024 * 1024;
-int active_allocations = 0;
+uint8_t memory_pool[MEMORY_POOL_SIZE];
+Block* free_list = NULL;
+AllocationStrategy current_strategy = FIRST_FIT;
 
-static allocation_strategy_t current_strategy = FIRST_FIT;
-
-// Simple memory block structure
-typedef struct Block {
-    size_t size;
-    int free;
-    struct Block* next;
-} Block;
-
-static uint8_t memory_pool[1024*1024];
-static Block* free_list = (Block*)memory_pool;
-
-void set_allocation_strategy(allocation_strategy_t strategy) {
-    current_strategy = strategy;
+// Initialize free list
+static void init_memory() {
+    if (!free_list) {
+        free_list = (Block*)memory_pool;
+        free_list->size = MEMORY_POOL_SIZE - sizeof(Block);
+        free_list->free = 1;
+        free_list->next = NULL;
+    }
 }
 
-static Block* find_free_block(size_t size) {
-    Block* curr = free_list;
-    Block* best = NULL;
+// Find a free block depending on strategy
+static Block* find_block(size_t size) {
+    Block *curr = free_list;
+    Block *best = NULL;
+    static Block* last_alloc = NULL; // for next-fit
+
     switch (current_strategy) {
         case FIRST_FIT:
             while (curr) {
@@ -37,6 +30,7 @@ static Block* find_free_block(size_t size) {
                 curr = curr->next;
             }
             break;
+
         case BEST_FIT:
             while (curr) {
                 if (curr->free && curr->size >= size) {
@@ -45,6 +39,7 @@ static Block* find_free_block(size_t size) {
                 curr = curr->next;
             }
             return best;
+
         case WORST_FIT:
             while (curr) {
                 if (curr->free && curr->size >= size) {
@@ -53,36 +48,66 @@ static Block* find_free_block(size_t size) {
                 curr = curr->next;
             }
             return best;
-        default:
-            return NULL;
+
+        case NEXT_FIT:
+            curr = last_alloc ? last_alloc : free_list;
+            Block* start = curr;
+            do {
+                if (curr->free && curr->size >= size) {
+                    last_alloc = curr;
+                    return curr;
+                }
+                curr = curr->next ? curr->next : free_list;
+            } while (curr != start);
+            break;
+
+        case QUICK_FIT:
+            // Simplified: use first fit
+            while (curr) {
+                if (curr->free && curr->size >= size) return curr;
+                curr = curr->next;
+            }
+            break;
     }
     return NULL;
 }
 
-void* mini_malloc_debug(size_t size, const char* file, int line) {
-    Block* block = find_free_block(size);
+void* mini_malloc(size_t size) {
+    init_memory();
+    Block* block = find_block(size);
     if (!block) return NULL;
 
+    if (block->size > size + sizeof(Block)) {
+        Block* new_block = (Block*)((uint8_t*)block + sizeof(Block) + size);
+        new_block->size = block->size - size - sizeof(Block);
+        new_block->free = 1;
+        new_block->next = block->next;
+        block->next = new_block;
+        block->size = size;
+    }
     block->free = 0;
-    allocated_memory += size;
-    free_memory -= size;
-    if (size > largest_free_block) largest_free_block = size;
-    active_allocations++;
-
-    log_allocation((uint8_t*)block + sizeof(Block), size, file, line);
+    log_allocation((uint8_t*)block + sizeof(Block), size, __FILE__, __LINE__);
     return (uint8_t*)block + sizeof(Block);
-}
-
-void* mini_malloc(size_t size) {
-    return mini_malloc_debug(size, "N/A", 0);
 }
 
 void mini_free(void* ptr) {
     if (!ptr) return;
     Block* block = (Block*)((uint8_t*)ptr - sizeof(Block));
     block->free = 1;
-    allocated_memory -= block->size;
-    free_memory += block->size;
-    active_allocations--;
     log_free(ptr);
+
+    // merge adjacent free blocks
+    Block* curr = free_list;
+    while (curr) {
+        if (curr->free && curr->next && curr->next->free) {
+            curr->size += sizeof(Block) + curr->next->size;
+            curr->next = curr->next->next;
+        } else {
+            curr = curr->next;
+        }
+    }
+}
+
+void set_allocation_strategy(AllocationStrategy strategy) {
+    current_strategy = strategy;
 }
